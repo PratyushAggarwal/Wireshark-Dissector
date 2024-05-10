@@ -1,0 +1,47 @@
+# file nfapi_p5_dissector.wsgd
+
+# v1.0    nfapi p5 dedicated messages
+# v1.1    added nfapi p5 combined and transparent messages
+
+# protocol metadata
+PROTONAME EdgeQ NR NFAPI P5 Protocol
+PROTOSHORTNAME EQ_NR_NFAPI_P5
+PROTOABBREV eq_nfapi_p5
+
+# conditions on which the dissector is applied:
+# the protocol will be applied on all SCTP messages with port = 8080
+PARENT_SUBFIELD sctp.port
+PARENT_SUBFIELD_RANGE   5001 9000 #PARENT_SUBFIELD_RANGE <low port> <high port>
+PARENT_SUBFIELD_VALUES  8088 8028   #PARENT_SUBFIELD_VALUES <port1> <port2> <port3> ... <portn>
+
+# the name of the header structure
+MSG_HEADER_TYPE                     SNFapiP5MsgHdr_t
+
+# field which permits to identify the message type
+MSG_ID_FIELD_NAME                   msgType
+
+MSG_TITLE                           msgType
+
+MSG_SUMMARY_SUBSIDIARY_FIELD_NAMES  msgLen
+
+MSG_HEADER_LENGTH                   16
+
+#MSG_TOTAL_LENGTH                   msgLen + 16
+
+PACKET_CONTAINS_ONLY_COMPLETE_MSG   yes
+
+MANAGE_WIRESHARK_PINFO         		yes
+
+PACKET_CONTAINS_ONLY_1_MSG          yes
+
+MSG_MAIN_TYPE                       T_eq_nr_nfapi_msg_switch(msgType)
+
+STATISTICS "NFAPI" [
+   "msgType" msgType,
+]
+
+# this token marks the end of the protocol description
+PROTO_TYPE_DEFINITIONS
+
+# refer to the description of the data format
+include nfapi_p5_dissector.fdesc;

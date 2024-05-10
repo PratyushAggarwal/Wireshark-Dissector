@@ -1,0 +1,1277 @@
+# file nfapi_p7_dissector.fdesc
+
+# v1.0    Added dissectors corresponding to interface:prisma_attach:commit-31a95f1
+# v1.1    Added stats
+# v1.2    Added DCI decoding functionality
+
+# Disabling DCI RIV decoding by default. To reduce log opening time.
+const uint32 SETTING_DCI_RIV_DECODE_ENABLED::int = 0;
+
+enum16 EPhyApiMsgType_t
+{
+   P5_PARAM_REQUEST               0
+   P5_PARAM_RESPONSE              1
+   P5_CONFIG_REQUEST              2
+   P5_CONFIG_RESPONSE             3
+   P5_START_REQUEST               4
+   P5_STOP_REQUEST                5
+   P5_STOP_INDICATION             6
+   P5_ERROR_INDICATION            7
+   P5_RESET_REQUEST               8
+   P5_RESET_INDICATION            9
+   
+   NFAPI_P7_DL_NODE_SYNC		  384
+   NFAPI_P7_UL_NODE_SYNC		  385
+   NFAPI_P7_TIMING_INFO			  386
+   NFAPI_OUT_OF_SYNC              768
+
+   P7_DL_TTI_REQUEST              128        
+   P7_UL_TTI_REQUEST              129   
+   P7_SLOT_INDICATION             130       
+   P7_UL_DCI_REQUEST              131       
+   P7_TX_DATA_REQUEST             132
+   P7_RX_DATA_INDICATION          133       
+   P7_CRC_INDICATION              134       
+   P7_UCI_INDICATION              135       
+   P7_SRS_INDICATION              136       
+   P7_RACH_INDICATION             137       
+
+   P7_PDCCH_DL_TTI_REQUEST        138
+   P7_PDSCH_DL_TTI_REQUEST        139
+   P7_SSB_CSIRS_DL_TTI_REQUEST    140
+   P7_PUSCH_UL_TTI_REQUEST        141
+   P7_PUCCH_UL_TTI_REQUEST        142
+   P7_PUCCH_UCI01_INDICATION      143
+   P7_PUCCH_UCI234_INDICATION     144
+   P7_PUSCH_UCI_INDICATION        145
+
+   P7_SRS_UL_TTI_REQUEST          146
+   P7_PREC_MATRIX_TBL_CFG_REQ     147
+   P7_DIGITAL_BF_TBL_CFG_REQ      148
+   P7_DL_PREC_AND_BF_TTI_REQ      149
+   P7_UL_BF_TTI_REQ               150
+   P7_SRS_PWR_INDICATION          151
+   P7_SRS_BEAMFORM_INDICATION     152
+}
+
+
+
+
+const uint32 MAX_NUM_CORESET_CARRIER::int = 2;
+const uint32 DCI_PAYLOAD_BYTE_LEN::int = 16;
+const uint32 MAX_CB_POS_LEN::int = 19;
+const uint32 MAX_NUM_PREAMBLE_CARRIER::int = 16;
+const uint32 MAX_HARQ_BIT_LEN::int = 3;
+const uint32 MAX_CSI_PART1BIT_LEN::int = 14;
+const uint32 MAX_CSI_PART2BIT_LEN::int = 14;
+const uint32 FTL_MAX_RB::int = 273;
+const uint32 FTL_MAX_NUM_ALLOC_IN_PRG::int = 1;
+
+struct SNFapiMsgSubHdr_t
+{
+   uint8 numMsg;
+   uint8 carrierId;
+}
+
+struct STimeStamp_t
+{
+   uint32 sec;
+   uint32 nsec;
+}
+
+function string sec_to_dhms (in uint32{min=0} value)
+{
+  hide var uint32   value_work = value;
+  hide var uint16   sec = value_work % 60;
+       set          value_work = (value_work - sec) / 60;
+  hide var uint16   min = value_work % 60;
+       set          value_work = (value_work - min) / 60;
+  hide var uint16   hour = value_work % 24;
+       set          value_work = (value_work - hour) / 24;
+  hide var uint16   days = value_work;
+  return  print("%02d:%02d:%02d", hour, min, sec);
+}
+
+struct SLogHeader
+{ 
+   uint32       logSeqNum;
+   STimeStamp_t msgTimeEpoch;
+   var string   msgTime = sec_to_dhms(msgTimeEpoch.sec) + print(".%06d", msgTimeEpoch.nsec/1000);
+}
+
+struct nfapi_p7_p19s_header
+{
+	uint16			 sequenceNumber;
+	uint24			 totalSDULength;
+	uint24			 byteOffset;
+	uint32 			 transmitTimestamp;
+}
+
+struct nfapi_msg_header
+{
+	uint8			 sruTerminationType;
+	uint8			 phyId;
+	EPhyApiMsgType_t msgType;
+	uint32 			 msgLen;
+}
+
+struct segmented_struct_t
+{
+	byte_order        big_endian;
+	nfapi_p7_p19s_header nfapiHdr;
+	uint8[totalSDULength - byteOffset] payload;
+}
+
+struct SNFapiMsgHdr_t
+{
+    byte_order        big_endian;
+	nfapi_p7_p19s_header nfapiHdr;
+	nfapi_msg_header     nfapiMsgHdr;
+	
+   #SLogHeader        logHdr;
+
+   #SNFapiMsgSubHdr_t fapiMsgSubHdr;
+   #EPhyApiMsgType_t  msgType;
+   #uint32            msgLen;
+}
+
+##########################################################################################
+###################################P7 DEDICATED MESSAGES##################################
+##########################################################################################
+
+struct nfapi_dl_node_sync
+{
+	SNFapiMsgHdr_t						    nfapiMsgHdr;
+	byte_order								big_endian;
+	uint32									t1;
+	int32									deltaSFNSlot;
+	uint8									subCarrierSpacing;
+}
+
+struct nfapi_ul_node_sync
+{
+	SNFapiMsgHdr_t						    nfapiMsgHdr;
+	byte_order								big_endian;
+	uint32									t1;
+	uint32									t2;
+	uint32									t3;
+}
+
+struct nfapi_timing_info
+{
+	SNFapiMsgHdr_t						    nfapiMsgHdr;
+	byte_order								big_endian;
+	uint16									lastSfn;
+	uint16									lastSlot;
+	uint32									lastTimingInfo;
+	uint32									dlttiJitter;
+	uint32									txDataJitter;
+	uint32									ulttiJitter;
+	uint32									uldciJitter;
+	int32									dlttiLatestDelay;
+	int32									txdataLatestDelay;
+	int32									ulttiLatestDelay;
+	int32									uldciLatestDelay;
+	int32									dlttiEarArrival;
+	int32									txdatareqEarArrival;
+	int32									ulttiEarArrival;
+	int32									uldciEarArrival;
+	uint8									subcarrierSpacing;
+}
+
+struct nfapi_out_of_sync_info
+{
+    SNFapiMsgHdr_t				nfapiMsgHdr;
+	byte_order					big_endian;
+    uint16                    	sequenceNumber;
+}
+
+
+##########################################################################################
+##################################P7 TRANSPARENT MESSAGES#################################
+##########################################################################################
+
+struct SSfnSlotInfo_t
+{
+   uint16 SFN;
+   uint16 Slot;
+}
+
+struct SCoresetInfo_t
+{
+   uint16 bwpSize;              
+   uint16 bwpStart;             
+
+   uint8  subcarrierSpacing;    
+   uint8  cyclicPrefix;         
+   uint8  startSymbolIndex;     
+   uint8  durationSymbols;      
+   
+   uint8[6]  freqDomainResource;
+   uint8  cceRegMappingType;    
+   uint8  regBundleSize;        
+
+   uint8  interleaverSize;                                  
+   uint8  coreSetType;          
+   uint16 shiftIndex;           
+
+   uint8  precoderGranularity;  
+   uint8[3]  pad;               
+}
+
+function uint32 calc_rbStart_and_rbSize_from_riv (in uint32 bwp_size, in uint32 riv, out uint16 rb_start, out uint16 num_rb)
+{
+   hide var uint32 n = 1;
+   hide var uint32 m = 0;
+
+   while (n <= bwp_size)
+   {
+      set m = 0;
+
+      while (m <= (bwp_size - n))
+      {
+         if ((n-1) <= (bwp_size/2))
+         {
+            if (riv == ((bwp_size * (n-1)) + m))
+            {
+               set num_rb = n;
+               set rb_start = m;
+            }
+         }
+         else
+         {
+            if (riv == (bwp_size * (bwp_size - n + 1)) + bwp_size - 1 - m)
+            {
+               set num_rb = n;
+               set rb_start = m;
+            }
+         }
+         set m = m + 1;
+      }
+      set n = n + 1;
+   }
+   
+   return 0;
+}
+
+struct SDci_10_Si_37b_Params
+{
+   # There is some issue in WGD with uint9. Not getting decoded properly. So splitting into two.
+   hide uint8 riv_8b;
+   hide uint1 riv_1b;
+   var uint32 riv_9b = (riv_8b << 1) + riv_1b;
+
+   if (SETTING_DCI_RIV_DECODE_ENABLED::int == 1)
+   {
+   hide var uint16 rb_start = 0;
+   hide var uint16 rb_size = 0;
+   hide var uint32 dummy = calc_rbStart_and_rbSize_from_riv(24, riv_9b, rb_start, rb_size);
+   var uint16 _dciRiv_rbStart = rb_start;
+   var uint16 _dciRiv_rbSize  = rb_size;
+   }
+
+   uint4 k0Index_4b;
+   uint1 vrb2Prb_1b;
+   uint5 mcs_5b;
+   uint2 rv_2b;
+   uint1 siInfInd_1b;
+   uint15 reserved_15b;
+   
+   padding_bits pad;
+}
+
+struct SDci_10_Pag_37b_Params
+{
+   uint2 shortMsgI_2b;
+   uint8 reserved_8b;
+
+   # There is some issue in WGD with uint9. Not getting decoded properly. So splitting into two.
+   hide uint8 riv_8b;
+   hide uint1 riv_1b;
+   var uint32 riv_9b = (riv_8b << 1) + riv_1b;
+
+   if (SETTING_DCI_RIV_DECODE_ENABLED::int == 1)
+   {
+   hide var uint16 rb_start = 0;
+   hide var uint16 rb_size = 0;
+   hide var uint32 dummy = calc_rbStart_and_rbSize_from_riv(24, riv_9b, rb_start, rb_size);
+   var uint16 _dciRiv_rbStart = rb_start;
+   var uint16 _dciRiv_rbSize  = rb_size;
+   }
+
+   uint4 k0Idx_4b;
+   uint1 vrb2Prb_1b;
+   uint5 mcs_5b;
+   uint2 tbScalingField_2b;
+   uint6 reserved1_6b;
+
+   padding_bits pad;
+}
+
+struct SDci_10_Rar_37b_Params
+{
+   # There is some issue in WGD with uint9. Not getting decoded properly. So splitting into two.
+   hide uint8 riv_8b;
+   hide uint1 riv_1b;
+   var uint32 riv_9b = (riv_8b << 1) + riv_1b;
+
+   if (SETTING_DCI_RIV_DECODE_ENABLED::int == 1)
+   {
+   hide var uint16 rb_start = 0;
+   hide var uint16 rb_size = 0;
+   hide var uint32 dummy = calc_rbStart_and_rbSize_from_riv(24, riv_9b, rb_start, rb_size);
+   var uint16 _dciRiv_rbStart = rb_start;
+   var uint16 _dciRiv_rbSize  = rb_size;
+   }
+
+   uint4 k0Index_4b;
+   uint1 vrb2Prb_1b;
+   uint5 mcs_5b;
+   uint2 tbScalingField_2b;
+   uint16 reserved_16b;
+
+   padding_bits pad;
+}
+
+struct SDci_10_tcrnti_37b_Params
+{
+   uint1 dci0or1_1b;
+
+   # There is some issue in WGD with uint9. Not getting decoded properly. So splitting into two.
+   hide uint8 riv_8b;
+   hide uint1 riv_1b;
+   var uint32 riv_9b = (riv_8b << 1) + riv_1b;
+
+   if (SETTING_DCI_RIV_DECODE_ENABLED::int == 1)
+   {
+   hide var uint16 rb_start = 0;
+   hide var uint16 rb_size = 0;
+   hide var uint32 dummy = calc_rbStart_and_rbSize_from_riv(24, riv_9b, rb_start, rb_size);
+   var uint16 _dciRiv_rbStart = rb_start;
+   var uint16 _dciRiv_rbSize  = rb_size;
+   }
+
+   uint4 k0Idx_4b;
+   uint1 vrb2Prb_1b;
+   uint5 mcs_5b;
+   uint1 ndi_1b;
+   uint2 rv_2b;
+   uint4 hqProcId_4b;
+   uint2 dai_2b;
+   uint2 tpc_2b;
+   uint3 pucchResIdx_3b;
+   uint3 k1Index_3b;
+
+   padding_bits pad;
+}
+
+struct SDci_11_crnti_48b_Params
+{
+   uint1 dci0or1_1b;
+
+   # There is some issue in WGD with uint16. Not getting decoded properly. So splitting into two.
+   hide uint8 riv_8b_1;
+   hide uint8 riv_8b_2;
+   var uint32 riv_16b = (riv_8b_1 << 8) + riv_8b_2;
+
+   if (SETTING_DCI_RIV_DECODE_ENABLED::int == 1)
+   {
+   hide var uint16 rb_start = 0;
+   hide var uint16 rb_size = 0;
+   hide var uint32 dummy = calc_rbStart_and_rbSize_from_riv(273, riv_16b, rb_start, rb_size);
+   var uint16 _dciRiv_rbStart = rb_start;
+   var uint16 _dciRiv_rbSize  = rb_size;
+   }
+
+   uint2 k0Index_2b;
+   uint5 mcs_5b;
+   uint1 ndi_1b;
+   uint2 rv_2b;
+   uint4 hqProcId_4b;
+   uint2 dai_2b;
+   uint2 tpc_2b;
+   uint3 pucchResIdx_3b;
+   uint3 k1Index_3b;
+   uint4 dmrsPortIdx_4b;
+   uint2 srsReqBits_2b;
+   uint1 dmrsScid_1b;
+}
+
+struct SDci_00_crnti_44b_Params
+{
+   uint1 dci0or1_1b;
+
+   # There is some issue in WGD with uint16. Not getting decoded properly. So splitting into two.
+   hide uint8 riv_8b_1;
+   hide uint8 riv_8b_2;
+   var uint32 riv_16b = (riv_8b_1 << 8) + riv_8b_2;
+
+   if (SETTING_DCI_RIV_DECODE_ENABLED::int == 1)
+   {
+   hide var uint16 rb_start = 0;
+   hide var uint16 rb_size = 0;
+   hide var uint32 dummy = calc_rbStart_and_rbSize_from_riv(273, riv_16b, rb_start, rb_size);
+   var uint16 _dciRiv_rbStart = rb_start;
+   var uint16 _dciRiv_rbSize  = rb_size;
+   }
+
+   uint4 k2Index_4b;
+   uint1 freqHop_1b;
+   uint5 mcs_5b;
+   uint1 ndi_1b;
+   uint2 rv_2b;
+   uint4 hqProcId_4b;
+   uint2 tpc_2b;
+   uint8 reserved_8b;
+
+   padding_bits pad;
+}
+
+struct SDciStruct_t
+{
+   uint16  rnti;           
+   uint16  scramblingId;   
+
+   uint16  scramblingRnti;
+   uint8   cceIndex;       
+   uint8   payloadSizeBits; 
+
+   bitfield16
+   {
+      uint5   aggregationLevel; 
+      uint5   beta_PDCCH_1_0; 
+      uint2   powerControlOffsetSS;
+      uint2   csIdx; 
+      uint2   pad; 
+   } bits16_1;
+
+   if (payloadSizeBits == 37)
+   {
+      if (rnti <= 16920)
+      {
+         SDci_10_Rar_37b_Params dl_dci10_rar;
+      }
+      else
+      {
+         if (rnti == 0xffff)
+         {
+            SDci_10_Si_37b_Params dl_dci10_si;
+         }
+         else
+         {
+            if (rnti == 0xfffe)
+            {
+               SDci_10_Pag_37b_Params dl_dci10_pag;
+            }
+            else
+            {
+               SDci_10_tcrnti_37b_Params dl_dci10_tcrnti;
+            }
+         }
+      }
+      raw(11) remaining_bytes;
+   }
+   else
+   {
+      if (payloadSizeBits == 48)
+      {
+         SDci_11_crnti_48b_Params dl_dci11_crnti;
+         raw(10) remaining_bytes;
+      }
+      else
+      {
+         if (payloadSizeBits == 44)
+         {
+            SDci_00_crnti_44b_Params ul_dci00_crnti;
+            raw(10) remaining_bytes;
+         }
+         else
+         {
+            uint8{d=bin}[DCI_PAYLOAD_BYTE_LEN::int]  payload;
+         }
+      }
+   }
+}
+
+struct SPdcchPduL2_t
+{
+   SCoresetInfo_t[MAX_NUM_CORESET_CARRIER::int]   coresetInfo;
+
+   uint8[MAX_NUM_CORESET_CARRIER::int]            numDci; 
+   uint8[2]                                       pad;
+
+   hide var uint16 numEntries = numDci[0] + numDci[1];
+
+   SDciStruct_t[numEntries]                       dciPduInfo;
+}
+
+struct SPdcchDlTtiReqL2_t
+{
+   SNFapiMsgHdr_t  nfapiMsgHdr;
+   byte_order 	   little_endian;
+   SSfnSlotInfo_t  slotInfo;
+   SPdcchPduL2_t   pdcchPduInfo;
+}
+
+struct SBwp_t
+{
+   uint16   bwpStart;              
+   uint16   bwpSize;              
+
+   uint8    subcarrierSpacing;  
+   uint8    cyclicPrefix;
+   uint8[2] pad;
+}
+
+struct SRbBitmap_t
+{
+   uint8[36]  rbBitmap;
+}
+
+struct SPdschPdu_t
+{
+   uint16   rnti;
+   uint8    pduIndex;
+   uint8    bwpIdx;
+
+   uint16   dataScramblingId;
+   uint16   dlDmrsScramblingId;
+
+   uint32  tbSizeCw0;
+
+   uint32  tbSizeCw1;
+
+   SRbBitmap_t  rbBitmapInfo;
+
+   bitfield32
+   {
+       uint1   scid;
+       uint2   pduBitmap;
+       uint4   nrOfLayers;
+       hide var uint32 stats_pdschNrOfLayers = nrOfLayers;
+       uint1    refPoint;
+       uint1    dmrsConfigType;
+       uint14   dlDmrsSymbPos;
+       uint2    numDmrsCdmGrpsNoData;
+       uint1    resourceAlloc;
+       uint2    nrOfCodewords;
+       uint4   qamModOrderCw0;
+   } bits32_1;
+
+   bitfield32
+   {
+   uint12   dmrsPorts;
+   uint4   qamModOrderCw1;
+   uint2   rvIndexCw0;
+   uint2   rvIndexCw1;
+   uint9   rbStart;
+   uint2    vrbtoPrbMapping;
+   uint1    ptrsFreqDensity;
+   } bits32_2;
+
+   bitfield32
+   {
+   uint9    rbSize;
+   hide var uint32 stats_pdschRbSize_histogram = (rbSize * 10)/273;
+   uint4    startSymbolIndex;
+   uint4    nrOfSymbols;
+   uint6    ptrsPortIndex;
+   uint2    ptrsTimeDensity;
+   uint2    ptrsReOffset;
+   uint2    nEpreRatioOfPDSCHToPTRS;
+   uint2    powerControlOffsetSS;
+   uint1    pad1;
+   } bits32_3;
+
+   bitfield32
+   {
+   uint5    powerControlOffset;
+   uint10   targetCodeRateCw0;
+   uint10   targetCodeRateCw1;
+   uint7    pad;
+   } bits32_4;
+   
+   uint8[4]     layerId;
+
+   uint32    tbsLbrm;
+}
+
+struct SPdschPduL2_t
+{
+   SBwp_t           bwp;
+   SPdschPdu_t      pdschPduInfo;
+}
+
+struct SPdschDlTtiReqL2_t
+{
+   SNFapiMsgHdr_t   nfapiMsgHdr;
+   byte_order 	   little_endian;
+   SSfnSlotInfo_t   slotInfo;
+   uint8          nPdschPdus;    
+   uint8[3]       pad;
+   SPdschPduL2_t[nPdschPdus] pdschPduInfoL2;
+}
+
+struct SUlDciRequestL2_t
+{
+   SNFapiMsgHdr_t   nfapiMsgHdr;
+   byte_order 	   little_endian;
+   SSfnSlotInfo_t   slotInfo;
+   SPdcchPduL2_t    pdcchPduInfo;
+}
+
+struct tx_data_tlv_t
+{
+   uint16 tag;
+   uint16 pad;
+   uint32 len;
+   uint8[len]  value;
+   uint8[(4 - ( len % 4 ))] pad;
+}
+
+
+struct SDlPduInfo_t
+{
+	uint32 pduLength;
+	uint16 pduIndex;
+	uint16 pad;
+	uint32 numTlv;
+	tx_data_tlv_t[numTlv] tlv;
+   #uint16 pduIndex;
+   #uint16 pad;
+
+   #uint32 tbLen;
+   #hide var uint32 stats_txDataReqTbLen = tbLen;
+
+   #int64{d=hex}  tbPtr;
+}
+
+struct STxDataRequest_t
+{
+   SNFapiMsgHdr_t   nfapiMsgHdr;
+   byte_order 	   little_endian;
+   SSfnSlotInfo_t   slotInfo;
+   uint16         numberDlPdu;
+   uint16         pad;
+   SDlPduInfo_t[numberDlPdu]  pduInfo;
+}
+
+struct SSsbPBchPayload_t
+{
+    uint32{d=hex} bchPayload;
+}
+
+struct SMacMibPdu_t
+{
+   uint8   dmrsTypeAPosition;
+   uint8   pdcchConfigSib1;
+   uint8   cellBarred;
+   uint8   intraFreqReselection;
+}
+
+struct SBchPayload_t
+{
+   SSsbPBchPayload_t ssbPbchInfo;
+   SMacMibPdu_t      mibInfo;
+}
+
+struct SSsbPdu_t
+{
+   uint16 physCellId;
+   uint8  betaPss;
+   uint8  ssbBlockIndex;
+
+   uint16 ssbOffsetPointA;
+   uint8  ssbSubcarrierOffset;
+   uint8  bchPayloadFlag;
+
+   SBchPayload_t bchPayload;
+}
+
+struct SCsiRsPdu_t
+{
+   bitfield32
+   {
+   uint8  bwpIdx;    
+   uint9  startRB;    
+   uint9  nrOfRBs;     
+   uint2  csiType;    
+   uint4  symbL1;    
+   } bits32_1;
+
+   bitfield32
+   {
+   uint5  row;           
+   uint12 freqDomain;    
+   uint4  symbL0;     
+   uint2  cdmType;        
+   uint2  freqDensity;           
+   uint5  powerControlOffset;  
+   uint2  powerControlOffsetSS;
+   } bits32_2;
+    
+   bitfield32
+   {
+   uint10 scrambId;    
+   uint22 pad;
+   } bits32_3;
+}
+
+struct SSsbCsiDlTtiReq_t
+{
+   SSfnSlotInfo_t   slotInfo;
+
+   uint8          numSsbPdu;
+   uint8          nCsiRsPdus;
+   uint8[2]       pad;    
+
+   SSsbPdu_t[2]     ssbPduInfo;
+
+   SCsiRsPdu_t[nCsiRsPdus]  csiRsPduInfo;
+}
+
+struct SSsbCsiDlTtiReqL2_t
+{
+   SNFapiMsgHdr_t nfapiMsgHdr;
+   byte_order 	   little_endian;
+   SSfnSlotInfo_t slotInfo;
+   SBwp_t         bwp;
+   SSsbCsiDlTtiReq_t ssbCsiDlTtiReqPdu;
+}
+
+struct SPrachPdu_t
+{
+   bitfield16
+   {
+   uint10         physCellID;
+   uint6          numPuschSlot;
+   } bits16_1;
+
+   uint8        NumPrachOcas;
+   uint8        prachFormat;
+   
+   uint8        numRa;
+   uint8        prachStartSymbol;
+   uint16       numCs;     
+}
+
+struct SNrLdpcTbParams
+{
+   bitfield32
+   {
+   uint8    num_cb;  
+   uint8    code_id;
+   uint1    cb_crc_select;  
+   uint15   cbLen;  
+   } bits32_1;
+
+   bitfield32
+   {
+   uint16 k0;  
+   uint16 Ncb;
+   } bits32_2;
+
+   bitfield32
+   {
+   uint16 nfiller;
+   uint16 K;
+   } bits32_3;
+}
+
+struct SPuschPdu_t
+{
+   uint16 rnti;
+   uint16 targetCodeRate;
+   uint16 dataScramblingId;
+   uint16 ulDmrsSymbPos;
+   uint16 ulDmrsScramblingId;
+   uint8  scid;
+   uint8  bwpIdx;
+
+   bitfield32
+   {
+   uint2 pduBitmap;
+   uint4 qamModOrder;
+   uint1 transformPrecoding;
+   uint3 nrOfLayers;
+   hide var uint32 stats_puschNrOfLayers = nrOfLayers;
+   uint1 dmrsConfigType;
+   uint2 numDmrsCdmGrpsNoData;
+   uint12 dmrsPorts;
+   uint1 resourceAlloc;
+   uint1 vrbtoPrbMapping;
+   uint1 uplinkFrequencyShift7p5khz;
+   uint4 startSymbolIndex;
+   } bits32_1;
+
+   uint8[36] rbBitmap;
+
+   bitfield32
+   {
+   uint9 rbStart;
+   uint9 rbSize;
+   hide var uint32 stats_puschRbSize_histogram = (rbSize * 10)/273;
+   uint12 txDirectCurrentLocation;
+   uint2 alphaScaling;
+   } bits32_2;
+   
+   bitfield32
+   {
+   uint7 csiPart1BitLength;
+   uint7 csiPart2BitLength;
+   uint5 betaOffsetCsi1;
+   uint5 betaOffsetCsi2;
+   uint4 betaOffsetHarqAck;
+   uint4 nrOfSymbols;
+   } bits32_3;
+   
+   bitfield32
+   {
+   uint5 harqAckBitLength;
+   uint8 numCb;
+   uint2 rvIndex;
+   uint4 harqProcessID;
+   uint1 newDataIndicator;
+   uint12 pad2;
+   } bits32_4;
+   
+   uint8[MAX_CB_POS_LEN::int] cbPresentAndPosition;
+   uint8 pad3;
+
+   uint32 tbSize;
+
+   bitfield32
+   {
+   uint4  hqBuff128MBPageAddrTblIdx;
+   uint28 hqBuff128MBPageOffset;
+   } bits32_5;
+   
+   uint32 hqBuffSize;
+
+   SNrLdpcTbParams nrLdpcTbParams;
+}
+
+struct SPuschPduL2_t
+{
+   uint32         handle; 
+   SBwp_t           bwp;
+
+   SPuschPdu_t      puschPdu;
+}
+
+struct SPuschUlTtiReqL2_t
+{
+   SNFapiMsgHdr_t nfapiMsgHdr;
+   byte_order 	   little_endian;   
+   SSfnSlotInfo_t slotInfo;    
+   SPrachPdu_t[2] prachPduInfo;
+   uint8 nPrachPdu;    
+   uint8 nULSCH;    
+   SPuschPduL2_t[nULSCH] puschPduL2;
+}
+
+struct SPucchPdu_t
+{
+   uint16   rnti;                
+   uint16   dmrsScramblingId;
+   
+   uint16   dataScramblingId;
+   uint8    bwpIdx; 
+   uint8    pad;
+   
+   bitfield32
+   {
+   uint3 formatType;            
+   uint2 multiSlotTxIndicator;
+   uint1 pi2Bpsk;
+   uint4 startSymbolIndex;
+   uint9 prbStart;   
+   uint5 prbSize;
+   uint3 timeDomainOccIdx;   
+   uint2 preDftOccIdx;    
+   uint3 preDftOccLen;
+   } bits32_1;
+
+   bitfield32
+   {
+   uint1    addDmrsFlag;        
+   uint4    dmrsCyclicshift;
+   uint4    nrOfSymbols;
+   uint1    srFlag1;        
+   uint5    bitLenHarq;        
+   uint7    bitLenCsiPart1;    
+   uint7    bitLenCsiPart2; 
+   uint1    freqHopFlag;
+   uint2    pad2;
+   } bits32_2;
+}
+
+struct SPucchPduL2_t
+{
+   uint32           handle;
+   SBwp_t           bwp;
+   SPucchPdu_t      pucchPduL2;
+}
+
+struct SPucchUlTtiReqL2_t
+{
+   SNFapiMsgHdr_t nfapiMsgHdr;
+   byte_order 	   little_endian;
+   SSfnSlotInfo_t slotInfo;
+   uint16 nULCCH;
+   SPucchPduL2_t[nULCCH] pucchPduL2;
+}
+
+struct SSlotIndication_t
+{
+   SNFapiMsgHdr_t nfapiMsgHdr;
+   byte_order 	   little_endian;
+   SSfnSlotInfo_t slotInfo;
+}
+
+struct SUlPduInfo_t
+{
+   uint32 handle;
+   uint16 rnti;  
+   uint8  harqID;
+   uint8  ulCqi;
+   uint32 tbLen;
+   uint16 ta;  
+   uint16 rssi;
+   uint8[tbLen] payload;
+   #int64{d=hex} puschPduPtr;
+}
+
+struct SRxDataIndication_t
+{
+   SNFapiMsgHdr_t   nfapiMsgHdr;   
+   byte_order 	   little_endian;
+   SSfnSlotInfo_t   slotInfo;    
+   uint16           numberUlPdu;    
+   uint16           pad;
+   SUlPduInfo_t[numberUlPdu] pduInfo;
+}
+
+struct SCrcInd_t
+{
+   uint32 handle;
+   uint16 rnti;
+
+   bitfield16
+   {
+   uint4  harqId;
+   uint1  tbCrcStatus; 
+   uint8 ulCqi2;
+   uint3 pad1;
+   } bits16_1;
+   
+   uint8 ulCqi;            
+   
+   bitfield8
+   {
+   uint7 timingAdvance;
+   uint1 pad2; 
+   } bits8_1;
+
+   bitfield16
+   {
+   uint11 rssi;   
+   uint5  pad3;
+   } bits16_2;
+   
+   uint8 numCb;       
+   uint8[MAX_CB_POS_LEN::int] cbCrcStatus;
+}
+
+struct SCrcIndMsgL2_t
+{
+   SNFapiMsgHdr_t   nfapiMsgHdr;  
+   byte_order 	   little_endian;
+   SSfnSlotInfo_t   slotInfo;   
+   uint8          NumCRCs;    
+   uint8[3]       pad;    
+   SCrcInd_t[NumCRCs] crcPdu;  
+}
+
+struct SRachPreambleInfo_t
+{
+   uint8   preambleIndex;
+   uint8   pad;          
+   uint16  timingAdvance;
+   uint32  preamblePwr;
+}
+
+struct SRachInd_t
+{
+   uint16   physCellID; 
+   uint8    symbolIndex;
+   uint8    slotIndex;
+   uint8    freqIndex;
+   uint8    avgRssi;
+   uint8    avgSnr;     
+   uint8    numPreamble;
+   SRachPreambleInfo_t[MAX_NUM_PREAMBLE_CARRIER::int] preInfo;
+}
+
+struct SRachIndMsg_t
+{
+   SNFapiMsgHdr_t nfapiMsgHdr;  
+   byte_order 	   little_endian;
+   SSfnSlotInfo_t slotInfo; 
+   SRachInd_t     rachInd;  
+}
+
+struct SHarqPucch01_t
+{
+   bitfield8
+   {
+   uint2 numHarq;
+   uint2 harqConfidenceLevel;
+   uint2  harqValue0;
+   uint2  harqValue1;
+   } bits8_1;
+
+   bitfield8
+   {
+   uint1 isValid;
+   uint7 resvd1;
+   } bits8_2;
+}
+
+struct SUciPucchPduFormat01_t
+{
+   uint32 handle;
+   uint16 rnti;  
+
+   bitfield16
+   {
+   uint2  pduBitMap;  
+   uint1  pucchFormat;
+   uint13 resvd1;
+   } bits16_1;
+
+   uint8  ulCqi;        
+
+   bitfield8
+   {
+   uint7 timingAdvance;
+   uint1 isSrValid;    
+   } bits8_1;
+
+   bitfield16
+   {
+   uint11 rssi;      
+   uint1 srIndication;     
+   uint2 srConfidenceLevel;
+   uint2 resvd3;
+   } bits16_2;
+
+   SHarqPucch01_t harqInfo;
+   uint16 resvd5;
+}
+
+struct SPucch01UciIndMsgL2_t
+{
+   SNFapiMsgHdr_t   nfapiMsgHdr;
+   byte_order 	   little_endian;   
+   SSfnSlotInfo_t   slotInfo;    
+   uint16         numPucch01Uci;    
+   uint16         pad;    
+   SUciPucchPduFormat01_t[numPucch01Uci]  pucch01UciPdu;
+}
+
+struct SSrPucch234_t
+{
+   bitfield8
+   {
+   uint4 srBitLen;
+   uint1 isValid;
+   uint3 pad;
+   } bits8_1;
+
+   uint8 srPayload;
+}
+
+struct SHarqPucch234_t
+{
+   bitfield8
+   {
+   uint2  harqCrc;
+   uint5 harqBitLen;
+   uint1 isValid;
+   } bits8_1;
+
+   uint8[MAX_HARQ_BIT_LEN::int] harqPayload;
+}
+
+struct SCsiPart1PucchPdu_t
+{
+   bitfield16
+   {
+   uint2 csiPart1Crc;
+   uint7 csiPart1BitLen;
+   uint1 isValid;
+   uint6 pad;
+   } bits16_1;
+
+   uint8[MAX_CSI_PART1BIT_LEN::int] csiPart1Payload;
+}
+
+struct SCsiPart2PucchPdu_t
+{
+   bitfield16
+   {
+   uint2 csiPart2Crc;
+   uint7 csiPart2BitLen;
+   uint1 isValid;
+   uint6 pad;
+   } bits16_1;
+
+   uint8[MAX_CSI_PART2BIT_LEN::int] csiPart2Payload;
+}
+
+struct SUciPucchPduFormat234_t
+{
+   uint32 handle;
+   uint16 rnti;
+
+   bitfield16
+   {
+   uint4 pduBitMap;
+   uint2 pucchFormat;
+   uint10 resvd1;
+   } bits16_1;
+
+   bitfield32
+   {
+   uint8 ulCqi;
+   uint7 timingAdvance;
+   uint1 resvd2;
+   uint11 rssi;
+   uint5 resvd3;
+   } bits32_1;
+
+   SSrPucch234_t srInfo;
+   uint16 resvd4;
+   SHarqPucch234_t      harqInfo;
+   SCsiPart1PucchPdu_t  csiPart1;
+   SCsiPart2PucchPdu_t  csiPart2;
+}
+
+struct SPucch234UciIndMsgL2_t
+{
+   SNFapiMsgHdr_t   nfapiMsgHdr;
+   byte_order 	   little_endian;
+   SSfnSlotInfo_t   slotInfo;    
+   uint8          numPucch234Uci;    
+   uint8[3]       pad;
+   SUciPucchPduFormat234_t[numPucch234Uci] pucch234UciPdu;
+   padding_bits pad;
+}
+
+alias SHarqInfoPuschPdu_t SHarqPucch234_t;
+alias SCsiPart1PuschPdu_t SCsiPart1PucchPdu_t;
+alias SCsiPart2PuschPdu_t SCsiPart2PucchPdu_t;
+
+struct SUciPuschPdu_t
+{
+   uint32 handle;
+   uint16 rnti;  
+
+   bitfield16
+   {
+   uint4  pduBitMap;
+   uint12 resvd1;
+   } bits16_1;
+
+   uint8  ulCqi;          
+
+   bitfield8
+   {
+   uint7 timingAdvance;
+   uint1 resvd2; 
+   } bits8_t;
+
+   bitfield16
+   {
+   uint11 rssi;
+   uint5  resvd3;
+   } bits16_2;
+
+   SHarqInfoPuschPdu_t  harq;       
+   SCsiPart1PuschPdu_t  csiPart1;
+   SCsiPart2PuschPdu_t  csiPart2;
+}
+
+struct SPuschUciIndMsgL2_t
+{
+   SNFapiMsgHdr_t   nfapiMsgHdr;    
+   byte_order 	   little_endian;
+   SSfnSlotInfo_t   slotInfo;              
+   uint8          numPuschUci;     
+   uint8[3]       pad;
+   SUciPuschPdu_t[numPuschUci] puschUciPdu;
+}
+
+struct SPrecAndBfPdu_t
+{
+   uint16  PMIdx;
+
+   bitfield8
+   {
+   uint4   startSymbol;
+   uint4   numSymbol;
+   } bits8_t;
+
+   uint8[1] resvd;
+}
+
+struct SPrgPrecAndBf_t
+{
+   uint8    numAlloc;
+   uint8[3] resvd;
+   SPrecAndBfPdu_t[FTL_MAX_NUM_ALLOC_IN_PRG::int] prgAllocInfo;
+}
+
+struct SPrgPrecAndBfInfo_t
+{
+   SPrgPrecAndBf_t[FTL_MAX_RB::int] txPrecAndBf;
+}
+
+struct SDlPrecAndBfTtiReq_t
+{
+   SNFapiMsgHdr_t  nfapiMsgHdr;
+   byte_order 	   little_endian;
+   SSfnSlotInfo_t  slotInfo;
+   uint16          numPRGs;
+   uint16          resvd;
+   SPrgPrecAndBfInfo_t txPrecAndBfInfo;
+}
+
+switch  T_eq_nr_fapi_msg_switch  EPhyApiMsgType_t
+{
+	case  EPhyApiMsgType_t::NFAPI_P7_DL_NODE_SYNC   : nfapi_dl_node_sync  "";
+	case  EPhyApiMsgType_t::NFAPI_P7_UL_NODE_SYNC	: nfapi_ul_node_sync  "";
+	case  EPhyApiMsgType_t::NFAPI_P7_TIMING_INFO	: nfapi_timing_info   "";
+	case  EPhyApiMsgType_t::NFAPI_OUT_OF_SYNC		: nfapi_out_of_sync_info "";
+    case  EPhyApiMsgType_t::P7_PDCCH_DL_TTI_REQUEST : SPdcchDlTtiReqL2_t  "";
+    case  EPhyApiMsgType_t::P7_UL_DCI_REQUEST       : SUlDciRequestL2_t   "";
+    case  EPhyApiMsgType_t::P7_PDSCH_DL_TTI_REQUEST : SPdschDlTtiReqL2_t  "";
+    case  EPhyApiMsgType_t::P7_TX_DATA_REQUEST      : STxDataRequest_t    "";
+    case  EPhyApiMsgType_t::P7_SSB_CSIRS_DL_TTI_REQUEST : SSsbCsiDlTtiReqL2_t "";
+    case  EPhyApiMsgType_t::P7_PUSCH_UL_TTI_REQUEST : SPuschUlTtiReqL2_t  "";
+    case  EPhyApiMsgType_t::P7_PUCCH_UL_TTI_REQUEST : SPucchUlTtiReqL2_t  "";
+    case  EPhyApiMsgType_t::P7_DL_PREC_AND_BF_TTI_REQ : SDlPrecAndBfTtiReq_t  "";
+
+    case  EPhyApiMsgType_t::P7_SLOT_INDICATION      : SSlotIndication_t   "";
+    case  EPhyApiMsgType_t::P7_RX_DATA_INDICATION   : SRxDataIndication_t "";
+    case  EPhyApiMsgType_t::P7_CRC_INDICATION       : SCrcIndMsgL2_t      "";
+    case  EPhyApiMsgType_t::P7_RACH_INDICATION      : SRachIndMsg_t       "";
+    case  EPhyApiMsgType_t::P7_PUCCH_UCI01_INDICATION   : SPucch01UciIndMsgL2_t "";
+    case  EPhyApiMsgType_t::P7_PUCCH_UCI234_INDICATION  : SPucch234UciIndMsgL2_t "";
+    case  EPhyApiMsgType_t::P7_PUSCH_UCI_INDICATION : SPuschUciIndMsgL2_t "";
+
+    default :
+        segmented_struct_t      segmented_pkt;
+        raw(msgLen)         the_end_of_the_message;
+}

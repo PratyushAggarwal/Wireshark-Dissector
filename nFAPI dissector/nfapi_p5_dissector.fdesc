@@ -1,0 +1,532 @@
+# file eq_nr_nfapi.fdesc
+
+# v1.0    nfapi p5 dedicated messages
+# v1.1    added nfapi p5 combined and transparent messages
+
+enum16 EPhyApiMsgType_t
+{
+   NFAPI_PNF_PARAM_REQUEST	      			256
+   NFAPI_PNF_PARAM_RESPONSE       			257
+   NFAPI_PNF_CONFIG_REQUEST       			258
+   NFAPI_PNF_CONFIG_RESPONSE      			259
+   NFAPI_PNF_START_REQUEST        			260               
+   NFAPI_PNF_START_RESPONSE       			261               
+   NFAPI_PNF_STOP_REQUEST         			262                 
+   NFAPI_PNF_STOP_RESPONSE        			263                 
+   NFAPI_START_RESPONSE           			264                
+   NFAPI_PNF_READY_INDICATION     			265   
+   
+   EP5_MSG_TYPE_PARAM_REQUEST    			0
+   EP5_MSG_TYPE_PARAM_RESPONSE				1
+   EP5_MSG_TYPE_CONFIG_REQUEST				2
+   EP5_MSG_TYPE_CONFIG_RESPONSE				3
+   EP5_MSG_TYPE_START_REQUEST				4
+   EP5_MSG_TYPE_STOP_REQUEST				5
+   EP5_MSG_TYPE_STOP_INDICATION				6
+   EP5_MSG_TYPE_ERROR_INDICATION			7
+   EP5_MSG_TYPE_RESET_REQUEST				8
+   EP5_MSG_TYPE_RESET_INDICATION			9
+   
+   NFAPI_P7_DL_NODE_SYNC					384
+   NFAPI_P7_UL_NODE_SYNC					385
+   NFAPI_P7_TIMING_INFO						386
+   
+}
+
+enum16 EPhyNfapiTags_t
+{
+	NFAPI_PNF_PARAM_GENERAL_TAG				4096
+	NFAPI_P7_VNF_ADDRESS_IPV4_TAG			256
+	NFAPI_P7_VNF_ADDRESS_IPV6_TAG			257
+	NFAPI_P7_VNF_PORT_TAG					258
+	NFAPI_P7_PNF_ADDRESS_IPV4_TAG			259
+	NFAPI_P7_PNF_ADDRESS_IPV6_TAG			260
+	NFAPI_P7_PNF_PORT_TAG					261
+	NFAPI_DL_TTI_TIMING_OFFSET_TAG			262
+	NFAPI_UL_TTI_TIMING_OFFSET_TAG			263
+	NFAPI_UL_DCI_TIMING_OFFSET_TAG			264
+	NFAPI_TX_DATA_TIMING_OFFSET_TAG			265
+	NFAPI_TIMING_WINDOW_TAG					286
+	NFAPI_TIMING_INFO_MODE_TAG				287
+	NFAPI_TIMING_INFO_PERIOD_TAG			288
+	NFAPI_P7_IP_FRAGMENTATION_ALLOWED_TAG	289
+	NFAPI_P7_TRANSPORT_TAG					290
+	NFAPI_P7_PNF_ETHERNET_ADDRESS_TAG		291
+	NFAPI_P7_VNF_ETHERNET_ADDRESS_TAG		292
+	NFAPI_ECPRI_MESSAGE_TYPE_TAG			293
+	NFAPI_ECPRI_PHY_TRANSPORT_ID_TAG		294
+	NFAPI_P7_VERSION_USED					295
+	FAPI_BODY_MSG_TAG 						3840
+}
+
+enum8 ENfapiErrorCode
+{
+	NFAPI_MSG_OK							0
+	NFAPI_MSG_INVALID_STATE					1
+	NFAPI_MSG_INVALID_CONFIG				2
+}
+
+enum8 EFapiErrorCode
+{
+	MSG_OK									0
+	MSG_INVALID_STATE						1
+	MSG_INVALID_CONFIG						2
+	OUT_OF_SYNC								3
+	MSG_SLOT_ERR							4
+	MSG_BCH_MISSING							5
+	MSG_INVALID_SFN							6
+	MSG_UL_DCI_ERR							7
+	MSG_TX_ERR								8
+	MSG_INVALID_PHY_ID						9
+	MSG_UNINSTANTIATED_PHY					10
+	MSG_INVALID_DFE_Profile					11
+	PHY_PROFILE_SELECTION_INCOMPATIBLE_WITH_RUNNING_PHY	12
+	FEU_NOT_INITIALIZED 					13
+	DFE_PROFILE_NOT_SELECTED				14
+	MSG_EXTENDED_VENDOR_STATUS				255
+}
+
+struct nfapi_p5_p19c_header_t
+{
+	uint16									segmentLength;
+	uint8									moreFlagSegmentNumber;
+	uint8									sequenceNumber;
+	uint32									transmitTimestamp;
+}
+
+struct nfapi_msg_hdr_t
+{
+    uint8 									sruTerminationType;
+    uint8 									phyId;
+    EPhyApiMsgType_t  						msgType;
+    uint32            						msgLen;
+}
+
+##########################################################################################
+###################################P5 DEDICATED MESSAGES##################################
+##########################################################################################
+
+struct SNFapiP5MsgHdr_t
+{
+    byte_order                   			big_endian;
+    nfapi_p5_p19c_header_t       			nfapiHdr;
+    nfapi_msg_hdr_t              			nfapiMsgHdr;
+}
+
+struct nfapi_pnf_ready_ind_t
+{
+	byte_order                   			big_endian;
+	SNFapiP5MsgHdr_t  						nfapi_msg;
+	uint32 									versionInfo;
+}
+
+struct nfapi_pnf_param_req_t
+{
+	byte_order                   			big_endian;
+	SNFapiP5MsgHdr_t      					nfapi_msg;
+}
+
+struct nfapi_pnf_gen_param_t
+{
+	uint16 									tag;
+	uint16									length;
+    uint8                     				nFAPISyncMode;
+	uint8 									locationMode;
+	uint8[16]								locationCoordinates;
+	uint16									maximumNumberPHY;
+	uint8[3]								orgUniqueIdent;
+	uint16									numberRFInstances;
+	uint16									numberDFEInstances;
+}
+
+struct nfapi_pnf_param_resp_t
+{
+	byte_order                   			big_endian;
+	SNFapiP5MsgHdr_t      					nfapi_msg;
+    ENfapiErrorCode  	 	  				errorCode; 
+    uint8                     				numTLV; 
+    nfapi_pnf_gen_param_t[numTLV+1] 		nfapi_pnf_gen_params;
+}
+
+struct nfapi_pnf_config_req_t
+{
+	byte_order                   			big_endian;
+	SNFapiP5MsgHdr_t      					nfapi_msg;
+	uint8									numTLV;
+}
+
+struct nfapi_pnf_config_resp_t
+{
+	byte_order                   			big_endian;
+	SNFapiP5MsgHdr_t      					nfapi_msg;
+	ENfapiErrorCode							errorCode;
+}
+
+struct nfapi_pnf_start_req_t
+{
+	byte_order                   			big_endian;
+	SNFapiP5MsgHdr_t      					nfapi_msg;
+}
+
+struct nfapi_pnf_start_resp_t
+{
+	byte_order                   			big_endian;
+	SNFapiP5MsgHdr_t      					nfapi_msg;
+	ENfapiErrorCode							errorCode;
+}
+
+struct nfapi_pnf_stop_req_t
+{
+	byte_order                   			big_endian;
+	SNFapiP5MsgHdr_t      					nfapi_msg;
+}
+
+struct nfapi_pnf_stop_resp_t
+{
+	byte_order                   			big_endian;
+	SNFapiP5MsgHdr_t      					nfapi_msg;
+	ENfapiErrorCode							errorCode;
+}
+
+##########################################################################################
+###########################P5 COMBINED AND TRANSPARENT MESSAGES###########################
+##########################################################################################
+
+
+struct nfapi_pnf_combined_param_req_t
+{
+	SNFapiP5MsgHdr_t						nfapi_msg;
+}
+
+struct tlv_t
+{
+   uint16{d=hex}   							tag;
+   uint16          							len;
+   
+   switch_expr T_switch_expr
+   {
+      case (tag == 0x1001) : 				uint16 dlBandwidth;
+      case (tag == 0x1002) : 				uint32 dlFrequency;
+      case (tag == 0x1003) : 				uint16[5] dlk0;
+      case (tag == 0x1004) : 				uint16[5] dlGridSize;
+      case (tag == 0x1005) : 				uint16 numTxAnt;
+      case (tag == 0x1006) : 				uint16 uplinkBandwidth;
+      case (tag == 0x1007) : 				uint32 uplinkFrequency;
+      case (tag == 0x1008) : 				uint16[5] ulk0;
+      case (tag == 0x1009) : 				uint16[5] ulGridSize;
+      case (tag == 0x100A) : 				uint16 numRxAnt;
+      case (tag == 0x100B) : 				uint8 FrequencyShift7p5KHz;
+      case (tag == 0x100C) : 				uint16 phyCellId;
+      case (tag == 0x100D) : 				uint8 FrameDuplexType;
+      case (tag == 0x100E) : 				uint32 ssPbchPower;
+      case (tag == 0x100F) : 				uint8 BchPayload;
+      case (tag == 0x1010) : 				uint8 ScsCommon;
+      case (tag == 0x1011) : 				uint8 prachSequenceLength;
+      case (tag == 0x1012) : 				uint8 prachSubCSpacing;
+      case (tag == 0x1013) : 				uint8 restrictedSetConfig;
+      case (tag == 0x1014) : 				uint8 numPrachFdOccasions;
+      case (tag == 0x1015) : 				uint16 prachRootSequenceIndex;
+      case (tag == 0x1016) : 				uint8 numRootSequences;
+      case (tag == 0x1017) : 				uint16 k1;
+      case (tag == 0x1018) : 				uint8 prachZeroCorrConf;
+      case (tag == 0x1019) : 				uint8 numUnusedRootSequences;
+      case (tag == 0x101A) : 				uint8 unusedRootSequences;
+      case (tag == 0x101B) : 				uint8 SsbPerRach;
+      case (tag == 0x101C) : 				uint8 prachMultipleCarriersInABand;
+      case (tag == 0x101D) : 				uint16 SsbOffsetPointA;
+      case (tag == 0x101E) : 				uint8 betaPss;
+      case (tag == 0x101F) : 				uint8 SsbPeriod;
+      case (tag == 0x1020) : 				uint8 SsbSubcarrierOffset;
+      case (tag == 0x1021) : 				uint32 MIB;
+      case (tag == 0x1022) : 				uint32 SsbMask;
+      case (tag == 0x1023) : 				uint8 BeamId_64;
+      case (tag == 0x1024) : 				uint8 ssPbchMultipleCarriersInABand;
+      case (tag == 0x1025) : 				uint8 multipleCellsSsPbchInACarrier;
+      case (tag == 0x1026) : 				uint8 TddPeriod;
+      case (tag == 0x1027) : 				uint8[len] SlotConfig;
+      case (tag == 0x1028) : 				uint8 RssiMeasurement;
+
+      default : 							uint8[len] unknown;
+   }
+}
+
+struct tlv_t_t_t
+{
+   uint16{d=hex}  							tag;
+   uint8          							len;
+   
+   switch_expr T_switch_expr
+   {
+      case (tag == 0x1001) : 				uint8 dlBandwidth;
+      case (tag == 0x1002) : 				uint8 dlFrequency;
+      case (tag == 0x1003) : 				uint8 dlk0;
+      case (tag == 0x1004) : 				uint8 dlGridSize;
+      case (tag == 0x1005) : 				uint8 numTxAnt;
+      case (tag == 0x1006) : 				uint8 uplinkBandwidth;
+      case (tag == 0x1007) : 				uint8 uplinkFrequency;
+      case (tag == 0x1008) : 				uint8 ulk0;
+      case (tag == 0x1009) : 				uint8 ulGridSize;
+      case (tag == 0x100A) : 				uint8 numRxAnt;
+      case (tag == 0x100B) : 				uint8 FrequencyShift7p5KHz;
+      case (tag == 0x100C) : 				uint8 phyCellId;
+      case (tag == 0x100D) : 				uint8 FrameDuplexType;
+      case (tag == 0x100E) : 				uint8 ssPbchPower;
+      case (tag == 0x100F) : 				uint8 BchPayload;
+      case (tag == 0x1010) : 				uint8 ScsCommon;
+      case (tag == 0x1011) : 				uint8 prachSequenceLength;
+      case (tag == 0x1012) : 				uint8 prachSubCSpacing;
+      case (tag == 0x1013) : 				uint8 restrictedSetConfig;
+      case (tag == 0x1014) : 				uint8 numPrachFdOccasions;
+      case (tag == 0x1015) : 				uint8 prachRootSequenceIndex;
+      case (tag == 0x1016) : 				uint8 numRootSequences;
+      case (tag == 0x1017) : 				uint8 k1;
+      case (tag == 0x1018) : 				uint8 prachZeroCorrConf;
+      case (tag == 0x1019) : 				uint8 numUnusedRootSequences;
+      case (tag == 0x101A) : 				uint8 unusedRootSequences;
+      case (tag == 0x101B) : 				uint8 SsbPerRach;
+      case (tag == 0x101C) : 				uint8 prachMultipleCarriersInABand;
+      case (tag == 0x101D) : 				uint8 SsbOffsetPointA;
+      case (tag == 0x101E) : 				uint8 betaPss;
+      case (tag == 0x101F) : 				uint8 SsbPeriod;
+      case (tag == 0x1020) : 				uint8 SsbSubcarrierOffset;
+      case (tag == 0x1021) : 				uint8 MIB;
+      case (tag == 0x1022) : 				uint8 SsbMask;
+      case (tag == 0x1023) : 				uint8 BeamId_64;
+      case (tag == 0x1024) : 				uint8 ssPbchMultipleCarriersInABand;
+      case (tag == 0x1025) : 				uint8 multipleCellsSsPbchInACarrier;
+      case (tag == 0x1026) : 				uint8 TddPeriod;
+      case (tag == 0x1027) : 				uint8 SlotConfig;
+      case (tag == 0x1028) : 				uint8 RssiMeasurement;
+
+      default : 							uint8[len] unknown;
+   }
+}
+
+struct tlv_t_t
+{
+   uint16{d=hex} 							tag;
+   uint16 									len;
+   
+   switch_expr T_switch_expr
+   {
+      case (tag == 0x0001) : 				uint16 ReleaseCapability;
+      case (tag == 0x0002) : 				uint16 PhyState;
+      case (tag == 0x0003) : 				uint8 Skip_blank_DL_CONFIG;
+      case (tag == 0x0004) : 				uint8 Skip_blank_UL_CONFIG;
+      case (tag == 0x0005) : 				uint16 NumConfigTLVsToReport;
+											tlv_t_t_t[NumConfigTLVsToReport] tlv;
+      case (tag == 0x0006) : 				uint8 cyclicPrefix;
+      case (tag == 0x0007) : 				uint8 supportedSubcarrierSpacingsDl;
+      case (tag == 0x0008) : 				uint16 supportedBandwidthDl;
+      case (tag == 0x0009) : 				uint8 supportedSubcarrierSpacingsUl;
+      case (tag == 0x000A) : 				uint16 supportedBandwidthUl;
+      case (tag == 0x000B) : 				uint8 cceMappingType;
+      case (tag == 0x000C) : 				uint8 coresetOutsideFirst3OfdmSymsOfSlot;
+      case (tag == 0x000D) : 				uint8 precoderGranularityCoreset;
+      case (tag == 0x000E) : 				uint8 pdcchMuMimo;
+      case (tag == 0x000F) :				uint8 pdcchPrecoderCycling;
+      case (tag == 0x0010) : 				uint8 maxPdcchsPerSlot;
+      case (tag == 0x0011) : 				uint8 pucchFormats;
+      case (tag == 0x0012) : 				uint8 maxPucchsPerSlot;
+      case (tag == 0x0013) : 				uint8 pdschMappingType;
+      case (tag == 0x0014) : 				uint8 pdschAllocationTypes;
+      case (tag == 0x0015) : 				uint8 pdschVrbToPrbMapping;
+      case (tag == 0x0016) : 				uint8 pdschCbg;
+      case (tag == 0x0017) : 				uint8 pdschDmrsConfigTypes;
+      case (tag == 0x0018) : 				uint8 pdschDmrsMaxLength;
+      case (tag == 0x0019) : 				uint8 pdschDmrsAdditionalPos;
+      case (tag == 0x001A) : 				uint8 maxPdschsTBsPerSlot;
+      case (tag == 0x001B) : 				uint8 maxNumberMimoLayersPdsch;
+      case (tag == 0x001C) : 				uint8 supportedMaxModulationOrderDl;
+      case (tag == 0x001D) : 				uint8 maxMuMimoUsersDl;
+      case (tag == 0x001E) : 				uint8 pdschDataInDmrsSymbols;
+      case (tag == 0x001F) : 				uint8 premptionSupport;
+      case (tag == 0x0020) : 				uint8 pdschNonSlotSupport;
+      case (tag == 0x0021) : 				uint8 uciMuxUlschInPusch;
+      case (tag == 0x0022) : 				uint8 uciOnlyPusch;
+      case (tag == 0x0023) : 				uint8 puschFrequencyHopping;
+      case (tag == 0x0024) : 				uint8 puschDmrsConfigTypes;
+      case (tag == 0x0025) : 				uint8 puschDmrsMaxLen;
+      case (tag == 0x0026) : 				uint8 puschDmrsAdditionalPos;
+      case (tag == 0x0027) : 				uint8 puschCbg;
+      case (tag == 0x0028) : 				uint8 puschMappingType;
+      case (tag == 0x0029) : 				uint8 puschAllocationTypes;
+      case (tag == 0x002A) : 				uint8 puschVrbToPrbMapping;
+      case (tag == 0x002B) : 				uint8 puschMaxPtrsPorts;
+      case (tag == 0x002C) : 				uint8 maxPduschsTBsPerSlot;
+      case (tag == 0x002D) : 				uint8 maxNumberMimoLayersNonCbPusch;
+      case (tag == 0x002E) : 				uint8 supportedModulationOrderUl;
+      case (tag == 0x002F) : 				uint8 maxMuMimoUsersUl;
+      case (tag == 0x0030) : 				uint8 dftsOfdmSupport;
+      case (tag == 0x0031) : 				uint8 puschAggregationFactor;
+      case (tag == 0x0032) : 				uint8 prachLongFormats;
+      case (tag == 0x0033) : 				uint8 prachShortFormats;
+      case (tag == 0x0034) : 				uint8 prachRestrictedSets;
+      case (tag == 0x0035) : 				uint8 maxPrachFdOccasionsInASlot;
+      case (tag == 0x0036) : 				uint8 RssiMeasurementSupport;
+   }
+}
+
+struct SParamResponseMsgL2_t
+{
+   byte_order								little_endian;
+   EFapiErrorCode           				error_code;
+   uint8           							num_tlvs;
+   tlv_t_t[num_tlvs]						tlv;
+}
+
+struct SConfigRequestMsgL2_t
+{
+   byte_order								little_endian;
+   uint8           							num_tlvs;
+   tlv_t[num_tlvs]							tlv;
+}
+
+struct param_tlv_t
+{
+	EPhyNfapiTags_t							tag;
+	uint16									len;
+	
+	switch_expr T_switch_expr
+	{
+	  case (tag == 3840) : 					SParamResponseMsgL2_t	fapi_msg_body;
+      case (len == 1) : 					uint8{d=hex} 			value;
+	  case (len == 2) : 					uint16{d=hex} 			value;
+	  case (len == 4) : 					uint32{d=hex} 			value;
+	  case (len == 6) : 					uint48{d=hex}			value;
+      default : 							uint8[len] 				value;
+	}  
+}
+
+struct config_tlv_t
+{
+	EPhyNfapiTags_t							tag;
+	uint16									len;
+	
+	switch_expr T_switch_expr
+	{
+	  case (tag == 3840) : 					SConfigRequestMsgL2_t	fapi_msg_body;
+      case (len == 1) : 					uint8{d=hex} 			value;
+	  case (len == 2) : 					uint16{d=hex} 			value;
+	  case (len == 4) : 					uint32{d=hex} 			value;
+	  case (len == 6) : 					uint48{d=hex}			value;
+      default : 							uint8[len]       		value;
+	}  
+}
+
+struct nfapi_pnf_combined_param_resp_t
+{
+	byte_order                   			big_endian;
+	SNFapiP5MsgHdr_t						nfapi_msg;
+	uint8									errorCode;
+	uint8									numTLV;
+	param_tlv_t[numTLV]						TLV;
+	padding_bits 							pad;
+}
+
+struct nfapi_pnf_combined_config_req_t
+{
+	byte_order                   			big_endian;
+	SNFapiP5MsgHdr_t						nfapi_msg;
+	uint8									numTLV;
+	config_tlv_t[numTLV]					TLV;
+	padding_bits 							pad;
+}
+
+struct tlv_config_resp
+{
+	uint16{d=hex}							tag;
+	uint16{d=hex}							length;
+	uint8{d=hex}[length]					value;
+}
+
+struct nfapi_pnf_combined_config_resp_t
+{
+	byte_order                   			big_endian;
+	SNFapiP5MsgHdr_t						nfapi_msg;
+	byte_order                   			little_endian;	
+	uint8									errorCode;
+	uint8           						num_unsupported_invalid_tlvs;
+	uint8           						num_invalid_tlvs_only_idle_config;
+	uint8           						num_missing_tlvs;
+	tlv_config_resp[num_unsupported_invalid_tlvs] invalid_tlvs;
+	tlv_config_resp[num_invalid_tlvs_only_idle_config] only_idle_config_tlvs;
+	tlv_config_resp[num_missing_tlvs]		missing_Tlvs;
+	padding_bits 							pad;
+}
+
+struct nfapi_pnf_combined_start_req_t
+{
+	byte_order                   			big_endian;
+	SNFapiP5MsgHdr_t						nfapi_msg;
+	padding_bits 							pad;
+}
+
+struct nfapi_pnf_combined_start_resp_t
+{
+	byte_order                   			big_endian;
+	SNFapiP5MsgHdr_t						nfapi_msg;
+	uint8									errorCode;
+	padding_bits 							pad;
+}
+
+
+struct nfapi_pnf_combined_stop_req_t
+{
+	byte_order                   			big_endian;
+	SNFapiP5MsgHdr_t						nfapi_msg;
+	padding_bits 							pad;
+}
+
+struct SSfnSlotInfo_t
+{
+	uint16 									SFN;
+	uint16 									Slot;
+}
+
+struct nfapi_pnf_combined_error_indication_t
+{
+	byte_order                   			big_endian;
+	SNFapiP5MsgHdr_t						nfapi_msg;
+	byte_order                   			little_endian;
+	SSfnSlotInfo_t  						slotInfo;
+	uint8									MessageId;
+	uint8									errorCode;
+	padding_bits 							pad;
+}
+
+struct 	nfapi_pnf_combined_stop_indication_t
+{
+	byte_order                   			big_endian;
+	SNFapiP5MsgHdr_t 						nfapi_msg;
+	byte_order                   			little_endian;
+	SSfnSlotInfo_t  						slotInfo;
+}
+	
+
+switch  T_eq_nr_nfapi_msg_switch  EPhyApiMsgType_t
+{
+	case  EPhyApiMsgType_t::NFAPI_PNF_READY_INDICATION    	: nfapi_pnf_ready_ind_t "";
+	case  EPhyApiMsgType_t::NFAPI_PNF_PARAM_REQUEST 		: nfapi_pnf_param_req_t "";
+	case  EPhyApiMsgType_t::NFAPI_PNF_PARAM_RESPONSE 		: nfapi_pnf_param_resp_t "";
+	case  EPhyApiMsgType_t::NFAPI_PNF_CONFIG_REQUEST 		: nfapi_pnf_config_req_t "";
+    case  EPhyApiMsgType_t::NFAPI_PNF_CONFIG_RESPONSE 		: nfapi_pnf_config_resp_t "";
+	case  EPhyApiMsgType_t::NFAPI_PNF_START_REQUEST 		: nfapi_pnf_start_req_t "";
+	case  EPhyApiMsgType_t::NFAPI_PNF_START_RESPONSE 		: nfapi_pnf_start_resp_t "";
+    case  EPhyApiMsgType_t::NFAPI_PNF_STOP_REQUEST 			: nfapi_pnf_stop_req_t "";
+	case  EPhyApiMsgType_t::NFAPI_PNF_STOP_RESPONSE 		: nfapi_pnf_stop_resp_t "";
+	
+	case  EPhyApiMsgType_t::EP5_MSG_TYPE_PARAM_REQUEST 		: nfapi_pnf_combined_param_req_t "";
+	case  EPhyApiMsgType_t::EP5_MSG_TYPE_PARAM_RESPONSE 	: nfapi_pnf_combined_param_resp_t "";
+	case  EPhyApiMsgType_t::EP5_MSG_TYPE_CONFIG_REQUEST 	: nfapi_pnf_combined_config_req_t "";
+	case  EPhyApiMsgType_t::EP5_MSG_TYPE_CONFIG_RESPONSE 	: nfapi_pnf_combined_config_resp_t "";
+	case  EPhyApiMsgType_t::EP5_MSG_TYPE_START_REQUEST 		: nfapi_pnf_combined_start_req_t "";
+	case  EPhyApiMsgType_t::NFAPI_START_RESPONSE 			: nfapi_pnf_combined_start_resp_t "";
+	case  EPhyApiMsgType_t::EP5_MSG_TYPE_STOP_REQUEST 		: nfapi_pnf_combined_stop_req_t "";
+	case  EPhyApiMsgType_t::EP5_MSG_TYPE_STOP_INDICATION 	: nfapi_pnf_combined_stop_indication_t "";
+	case  EPhyApiMsgType_t::EP5_MSG_TYPE_ERROR_INDICATION 	: nfapi_pnf_combined_error_indication_t "";
+
+    default :
+        SNFapiP5MsgHdr_t      nfapiMsgHdr;
+        raw(msgLen)         the_end_of_the_message;
+}

@@ -1,0 +1,36 @@
+# file eq_nr_fapi.wsgd
+
+# protocol metadata
+PROTONAME EdgeQ NR FAPI Protocol
+PROTOSHORTNAME EQ_FAPI
+PROTOABBREV eq_fapi
+
+# conditions on which the dissector is applied:
+# the protocol will be applied on all UDP messages with port = 7878
+PARENT_SUBFIELD udp.port
+PARENT_SUBFIELD_VALUES 7878
+
+# the name of the header structure
+MSG_HEADER_TYPE                     SNFapiMsgHdr_t
+# field which permits to identify the message type.
+MSG_ID_FIELD_NAME                   msgType
+
+MSG_TITLE                           msgType
+
+MSG_SUMMARY_SUBSIDIARY_FIELD_NAMES  msgLen
+
+MSG_HEADER_LENGTH                   20
+
+MSG_TOTAL_LENGTH                    msgLen + 20
+
+PACKET_CONTAINS_ONLY_COMPLETE_MSG   yes
+
+PACKET_CONTAINS_ONLY_1_MSG          yes
+
+MSG_MAIN_TYPE                       T_eq_nr_fapi_msg_switch(msgType)
+
+# this token marks the end of the protocol description
+PROTO_TYPE_DEFINITIONS
+
+# refer to the description of the data format
+include eq_nr_fapi.fdesc;

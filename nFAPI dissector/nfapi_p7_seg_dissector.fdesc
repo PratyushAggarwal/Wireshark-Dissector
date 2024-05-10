@@ -1,0 +1,40 @@
+
+enum16 EPhyApiMsgType_t
+{
+   WRONG               -1
+}
+
+struct nfapi_p7_p19s_header
+{
+	byte_order		 		big_endian;
+	EPhyApiMsgType_t 		sequenceNumber;
+	uint24			 		totalSDULength;
+	uint24			 		byteOffset;
+	uint32 			 		transmitTimestamp;
+	hide var uint24 p7_threshold = 1000;
+	if (totalSDULength < p7_threshold)
+	{
+		uint8[totalSDULength] 	buffer;
+	}
+	else
+	{
+		if ((totalSDULength - byteOffset) < (p7_threshold - 12))
+		{
+			uint8[totalSDULength - byteOffset] buffer;
+		}
+		else
+		{
+			uint8[p7_threshold - 12] 	buffer;
+		}
+	}
+		
+}
+
+switch  T_eq_nr_fapi_msg_switch  EPhyApiMsgType_t
+{
+	case  EPhyApiMsgType_t::WRONG   : nfapi_p7_p19s_header  "";
+
+    default :
+        nfapi_p7_p19s_header     NfapiMsg;
+        raw(0)         			the_end_of_the_message;
+}

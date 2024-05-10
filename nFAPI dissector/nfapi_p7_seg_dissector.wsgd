@@ -1,0 +1,56 @@
+# file nfapi_p7_dissector.wsgd
+
+# v1.0    Added dissectors corresponding to interface:prisma_attach:commit-31a95f1
+# v1.1    Added stats
+# v1.2    Added DCI decoding functionality
+
+# protocol metadata
+PROTONAME EdgeQ NR NFAPI P7 SEG Protocol
+PROTOSHORTNAME EQ_NR_FAPI_P7_SEG
+PROTOABBREV eq_fapi_p7_seg
+
+# conditions on which the dissector is applied:
+# the protocol will be applied on all UDP messages with port = 8888
+PARENT_SUBFIELD udp.port
+PARENT_SUBFIELD_VALUES 0000
+
+# the name of the header structure
+MSG_HEADER_TYPE                     nfapi_p7_p19s_header
+
+# field which permits to identify the message type
+MSG_ID_FIELD_NAME                   sequenceNumber
+
+#MSG_TITLE                          totalSDULength
+
+MSG_SUMMARY_SUBSIDIARY_FIELD_NAMES  totalSDULength
+MSG_SUMMARY_SUBSIDIARY_FIELD_NAMES  byteOffset
+
+MSG_HEADER_LENGTH                   12
+
+#MSG_TOTAL_LENGTH                    totalSDULength + 12
+
+PACKET_CONTAINS_ONLY_COMPLETE_MSG   yes
+
+PACKET_CONTAINS_ONLY_1_MSG          yes
+
+MSG_MAIN_TYPE                       T_eq_nr_fapi_msg_switch(sequenceNumber)
+
+STATISTICS "EQ NR FAPI" [
+#   "msgType" msgType,
+    "SSBCSIRS_numSsbPdu" numSsbPdu, "SSBCSIRS_nCsiRsPdus" nCsiRsPdus,
+    "RACH_numPreamble" numPreamble,
+    "PUCCH01_srIndication" srIndication,
+    "PUSCH_nULSCH" nULSCH, "PUSCH_rbSize_histogram 10% slab" stats_puschRbSize_histogram, "PUSCH_targetCodeRate" targetCodeRate, "PUSCH_qamModOrder" qamModOrder, "PUSCH_rvIndex" rvIndex, "PUSCH_nrOfLayers" stats_puschNrOfLayers,
+    "PDCCH_csIdx" csIdx, "PDCCH_scramblingRnti" scramblingRnti, "PDCCH_aggregationLevel" aggregationLevel,
+    "PDSCH_rbSize_histogram 10% slab" stats_pdschRbSize_histogram, "PDSCH_targetCodeRateCw0" targetCodeRateCw0, "PDSCH_qamModOrderCw0" qamModOrderCw0, "PDSCH_rvIndexCw0" rvIndexCw0, "PDSCH_nrOfLayers" stats_pdschNrOfLayers,
+#   "PDSCH_tbSizeCw0" tbSizeCw0, 
+#   "TXDATA_tbLen" stats_txDataReqTbLen,
+    "RXDATA_numberUlPdu" numberUlPdu,
+    "CRCIND_NumCRCs" NumCRCs, "CRCIND_tbCrcStatus"  tbCrcStatus,
+]
+
+# this token marks the end of the protocol description
+PROTO_TYPE_DEFINITIONS
+
+# refer to the description of the data format
+include nfapi_p7_seg_dissector.fdesc;
