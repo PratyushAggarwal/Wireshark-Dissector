@@ -5,16 +5,16 @@
 
 enum16 EPhyApiMsgType_t
 {
-   NFAPI_PNF_PARAM_REQUEST	      			256
-   NFAPI_PNF_PARAM_RESPONSE       			257
-   NFAPI_PNF_CONFIG_REQUEST       			258
-   NFAPI_PNF_CONFIG_RESPONSE      			259
-   NFAPI_PNF_START_REQUEST        			260               
-   NFAPI_PNF_START_RESPONSE       			261               
-   NFAPI_PNF_STOP_REQUEST         			262                 
-   NFAPI_PNF_STOP_RESPONSE        			263                 
-   NFAPI_START_RESPONSE           			264                
-   NFAPI_PNF_READY_INDICATION     			265   
+   P5_NFAPI_PNF_PARAM_REQUEST	      			256
+   P5_NFAPI_PNF_PARAM_RESPONSE       			257
+   P5_NFAPI_PNF_CONFIG_REQUEST       			258
+   P5_NFAPI_PNF_CONFIG_RESPONSE      			259
+   P5_NFAPI_PNF_START_REQUEST        			260               
+   P5_NFAPI_PNF_START_RESPONSE       			261               
+   P5_NFAPI_PNF_STOP_REQUEST         			262                 
+   P5_NFAPI_PNF_STOP_RESPONSE        			263                 
+   P5_NFAPI_START_RESPONSE           			264                
+   P5_NFAPI_PNF_READY_INDICATION     			265   
    
    EP5_MSG_TYPE_PARAM_REQUEST    			0
    EP5_MSG_TYPE_PARAM_RESPONSE				1
@@ -31,6 +31,12 @@ enum16 EPhyApiMsgType_t
    NFAPI_P7_UL_NODE_SYNC					385
    NFAPI_P7_TIMING_INFO						386
    
+   P19_NFAPI_RF_PARAM_REQUEST				0x0400
+   P19_NFAPI_RF_PARAM_RESPONSE				0x0401
+   P19_NFAPI_RF_CONFIG_REQUEST				0x0402
+   P19_NFAPI_RF_CONFIG_RESPONSE				0x0403
+   P19_NFAPI_RF_START_REQUEST				0x0407
+   P19_NFAPI_RF_START_RESPONSE				0x0408   
 }
 
 enum16 EPhyNfapiTags_t
@@ -503,28 +509,148 @@ struct 	nfapi_pnf_combined_stop_indication_t
 	SSfnSlotInfo_t  						slotInfo;
 }
 	
+##########################################################################################
+###################################P19 DEDICATED MESSAGES#################################
+##########################################################################################
+
+struct nfapi_rf_param_request_t
+{
+	byte_order								big_endian;
+	SNFapiP5MsgHdr_t						nfapi_msg;	
+}
+
+struct rf_param_res_tlv_t
+{
+	uint16{d=hex}  							tag;
+	uint16          						len;
+   
+	switch_expr T_switch_expr
+	{
+		case (tag == 0x6000) : 				uint16 releaseCapbility;
+		case (tag == 0x6003) : 				uint8 freqScale;
+
+		default : 							uint8[len] unknown;
+	}
+}
+
+struct nfapi_rf_param_response_t
+{
+	byte_order								big_endian;
+	SNFapiP5MsgHdr_t						nfapi_msg;
+	uint8									errorCode;
+	uint8									numTLV;
+	rf_param_res_tlv_t[numTLV]				tlvs;
+}
+
+struct tx_rfchain_cfg_tlv_t
+{
+	uint8									RFchainIdx;
+	uint8									RFchain_ctrl;
+	uint8									bandType;
+	uint16									bandnum;
+	uint8									carrierIdx;
+	uint8									bandwidth;
+	uint32									carrierFreq;
+	int16									nominalRmsOutPower;
+	int16									nominalRmsInputPower;
+	int16									gain;
+	uint8									subcarrierSpacing;
+	uint8									cyclicPrefix;
+}
+
+struct rf_rfchain_cfg_tlv_t
+{
+	uint8									RFchainIdx;
+	uint8									RFchain_ctrl;
+	uint8									bandType;
+	uint16									bandnum;
+	uint8									carrierIdx;
+	uint8									bandwidth;
+	uint32									carrierFreq;
+	int16									gain;
+	uint8									subcarrierSpacing;
+	uint8									cyclicPrefix;
+}
+
+struct rf_config_req_tlv_t
+{
+	uint16{d=hex}  							tag;
+	uint16          						len;
+   
+	switch_expr T_switch_expr
+	{
+		case (tag == 0x6100) : 				tx_rfchain_cfg_tlv_t TX_RF_CHAIN_CFG_TLV;
+		case (tag == 0x6110) : 				rf_rfchain_cfg_tlv_t RF_RF_CHAIN_CFG_TLV;
+		case (tag == 0x5555) :				uint32	 			 dal_rf_cfg_tlv_value;
+
+		default : 							uint8[len] unknown;
+	}
+}
+
+struct nfapi_rf_config_request_t
+{
+	byte_order								big_endian;
+	SNFapiP5MsgHdr_t						nfapi_msg;
+	uint8									numTLV;
+	rf_config_req_tlv_t[numTLV]				tlvs;
+}
+
+struct nfapi_rf_config_response_t
+{
+	byte_order								big_endian;
+	SNFapiP5MsgHdr_t						nfapi_msg;
+	uint8									errorCode;
+	uint8									numOfInvalidOrUnsupportedTlvs;
+	uint8									numOfInvalidTlvsThatCanOnlyBeConfiguredInIDLE;
+	uint8									numOfInvalidTlvsThatCanOnlyBeConfiguredInRUNNING;
+	uint8									numOfMissingTlvs;
+	uint16[numOfInvalidOrUnsupportedTlvs]					InvalidOrUnsupportedTlvs;
+	uint16[numOfInvalidTlvsThatCanOnlyBeConfiguredInIDLE]	InvalidTlvsThatCanOnlyBeConfiguredInIDLE;
+	uint16[numOfInvalidTlvsThatCanOnlyBeConfiguredInIDLE]	InvalidTlvsThatCanOnlyBeConfiguredInRUNNING;
+	uint16[numOfMissingTlvs]								MissingTlvs;
+}
+
+struct nfapi_rf_start_request_t
+{
+	byte_order								big_endian;
+	SNFapiP5MsgHdr_t						nfapi_msg;
+}
+
+struct nfapi_rf_start_response_t
+{
+	byte_order								big_endian;
+	SNFapiP5MsgHdr_t						nfapi_msg;
+	uint8									errorCode;
+}
 
 switch  T_eq_nr_nfapi_msg_switch  EPhyApiMsgType_t
 {
-	case  EPhyApiMsgType_t::NFAPI_PNF_READY_INDICATION    	: nfapi_pnf_ready_ind_t "";
-	case  EPhyApiMsgType_t::NFAPI_PNF_PARAM_REQUEST 		: nfapi_pnf_param_req_t "";
-	case  EPhyApiMsgType_t::NFAPI_PNF_PARAM_RESPONSE 		: nfapi_pnf_param_resp_t "";
-	case  EPhyApiMsgType_t::NFAPI_PNF_CONFIG_REQUEST 		: nfapi_pnf_config_req_t "";
-    case  EPhyApiMsgType_t::NFAPI_PNF_CONFIG_RESPONSE 		: nfapi_pnf_config_resp_t "";
-	case  EPhyApiMsgType_t::NFAPI_PNF_START_REQUEST 		: nfapi_pnf_start_req_t "";
-	case  EPhyApiMsgType_t::NFAPI_PNF_START_RESPONSE 		: nfapi_pnf_start_resp_t "";
-    case  EPhyApiMsgType_t::NFAPI_PNF_STOP_REQUEST 			: nfapi_pnf_stop_req_t "";
-	case  EPhyApiMsgType_t::NFAPI_PNF_STOP_RESPONSE 		: nfapi_pnf_stop_resp_t "";
+	case  EPhyApiMsgType_t::P5_NFAPI_PNF_READY_INDICATION   : nfapi_pnf_ready_ind_t "";
+	case  EPhyApiMsgType_t::P5_NFAPI_PNF_PARAM_REQUEST 		: nfapi_pnf_param_req_t "";
+	case  EPhyApiMsgType_t::P5_NFAPI_PNF_PARAM_RESPONSE 	: nfapi_pnf_param_resp_t "";
+	case  EPhyApiMsgType_t::P5_NFAPI_PNF_CONFIG_REQUEST 	: nfapi_pnf_config_req_t "";
+    case  EPhyApiMsgType_t::P5_NFAPI_PNF_CONFIG_RESPONSE 	: nfapi_pnf_config_resp_t "";
+	case  EPhyApiMsgType_t::P5_NFAPI_PNF_START_REQUEST 		: nfapi_pnf_start_req_t "";
+	case  EPhyApiMsgType_t::P5_NFAPI_PNF_START_RESPONSE 	: nfapi_pnf_start_resp_t "";
+    case  EPhyApiMsgType_t::P5_NFAPI_PNF_STOP_REQUEST 		: nfapi_pnf_stop_req_t "";
+	case  EPhyApiMsgType_t::P5_NFAPI_PNF_STOP_RESPONSE 		: nfapi_pnf_stop_resp_t "";
 	
 	case  EPhyApiMsgType_t::EP5_MSG_TYPE_PARAM_REQUEST 		: nfapi_pnf_combined_param_req_t "";
 	case  EPhyApiMsgType_t::EP5_MSG_TYPE_PARAM_RESPONSE 	: nfapi_pnf_combined_param_resp_t "";
 	case  EPhyApiMsgType_t::EP5_MSG_TYPE_CONFIG_REQUEST 	: nfapi_pnf_combined_config_req_t "";
 	case  EPhyApiMsgType_t::EP5_MSG_TYPE_CONFIG_RESPONSE 	: nfapi_pnf_combined_config_resp_t "";
 	case  EPhyApiMsgType_t::EP5_MSG_TYPE_START_REQUEST 		: nfapi_pnf_combined_start_req_t "";
-	case  EPhyApiMsgType_t::NFAPI_START_RESPONSE 			: nfapi_pnf_combined_start_resp_t "";
+	case  EPhyApiMsgType_t::P5_NFAPI_START_RESPONSE 		: nfapi_pnf_combined_start_resp_t "";
 	case  EPhyApiMsgType_t::EP5_MSG_TYPE_STOP_REQUEST 		: nfapi_pnf_combined_stop_req_t "";
 	case  EPhyApiMsgType_t::EP5_MSG_TYPE_STOP_INDICATION 	: nfapi_pnf_combined_stop_indication_t "";
 	case  EPhyApiMsgType_t::EP5_MSG_TYPE_ERROR_INDICATION 	: nfapi_pnf_combined_error_indication_t "";
+
+	case  EPhyApiMsgType_t::P19_NFAPI_RF_PARAM_REQUEST    	: nfapi_rf_param_request_t "";
+	case  EPhyApiMsgType_t::P19_NFAPI_RF_PARAM_RESPONSE 	: nfapi_rf_param_response_t "";
+	case  EPhyApiMsgType_t::P19_NFAPI_RF_CONFIG_REQUEST 	: nfapi_rf_config_request_t "";
+	case  EPhyApiMsgType_t::P19_NFAPI_RF_CONFIG_RESPONSE 	: nfapi_rf_config_response_t "";
+    case  EPhyApiMsgType_t::P19_NFAPI_RF_START_REQUEST 		: nfapi_rf_start_request_t "";
+	case  EPhyApiMsgType_t::P19_NFAPI_RF_START_RESPONSE 	: nfapi_rf_start_response_t "";
 
     default :
         SNFapiP5MsgHdr_t      nfapiMsgHdr;
