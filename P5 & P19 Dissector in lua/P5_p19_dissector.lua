@@ -91,6 +91,12 @@ function get_opcode_name(opcode)
 	elseif opcode ==    7 then opcode_name = "EP5_MSG_TYPE_ERROR_INDICATION"
 	elseif opcode ==    8 then opcode_name = "EP5_MSG_TYPE_RESET_REQUEST"
 	elseif opcode ==    9 then opcode_name = "EP5_MSG_TYPE_RESET_INDICATION"
+	elseif opcode == 1024 then opcode_name = "P19_NFAPI_RF_PARAM_REQUEST"
+	elseif opcode == 1025 then opcode_name = "P19_NFAPI_RF_PARAM_RESPONSE"
+	elseif opcode == 1026 then opcode_name = "P19_NFAPI_RF_CONFIG_REQUEST"
+	elseif opcode == 1027 then opcode_name = "P19_NFAPI_RF_CONFIG_RESPONSE"
+	elseif opcode == 1031 then opcode_name = "P19_NFAPI_RF_START_REQUEST"
+	elseif opcode == 1032 then opcode_name = "P19_NFAPI_RF_START_RESPONSE"
 	end
 
   return opcode_name
@@ -618,6 +624,114 @@ function parse_t16_l16_v(tlvs1, buffer, i, bufIdx)
 	return length
 end
 
+function rf_param_res_tlv(payloadSubtree, buffer, i, bufIdx)
+	local length = 0
+	local subtree = payload:add(nfapi_protocol, buffer(), "TLV ["..i.."]")
+	local tag = buffer(bufIdx +  length, 2):le_uint()
+	subtree:add("TAG: ", buffer(bufIdx + length, 2):le_uint())
+	length = length + 2
+	subtree:add("Length: ", buffer(bufIdx + length, 2):le_uint())
+	length = length + 2
+
+	if tag == 0x6000 then 
+		subtree:add("releaseCapbility: ", buffer(bufIdx + length, 2):le_uint())
+		length = length + 2
+	elseif tag == 0x6003 then
+		subtree:add("freqScale: ", buffer(bufIdx +  length, 1):le_uint())
+		length = length + 2
+	else
+		local len = buffer(bufIdx - length, 2):le_uint()
+		for j = 0, len - 1, 1 do
+			subtree:add("value["..j.."]: ", buffer(bufIdx +  length, 1):le_uint())
+			length = length + 1
+		end 
+	end
+	return length
+end
+
+function tx_rfchain_cfg_tlv(subtree, buffer, bufIdx)
+	local length = 0
+	subtree:add("RFchainIdx", buffer(bufIdx +  length, 1):le_uint())
+	length = length + 1
+	subtree:add("RFchain_ctrl", buffer(bufIdx +  length, 1):le_uint())
+	length = length + 1
+	subtree:add("bandType", buffer(bufIdx +  length, 1):le_uint())
+	length = length + 1
+	subtree:add("bandnum", buffer(bufIdx +  length, 2):le_uint())
+	length = length + 2
+	subtree:add("carrierIdx", buffer(bufIdx +  length, 1):le_uint())
+	length = length + 1
+	subtree:add("bandwidth", buffer(bufIdx +  length, 1):le_uint())
+	length = length + 1
+	subtree:add("carrierFreq", buffer(bufIdx +  length, 4):le_uint())
+	length = length + 4
+	subtree:add("nominalRmsOutPower", buffer(bufIdx +  length, 2):le_uint())
+	length = length + 2
+	subtree:add("nominalRmsInputPower", buffer(bufIdx +  length, 2):le_uint())
+	length = length + 2
+	subtree:add("gain", buffer(bufIdx +  length, 2):le_int())
+	length = length + 2
+	subtree:add("subcarrierSpacing", buffer(bufIdx +  length, 1):le_uint())
+	length = length + 1
+	subtree:add("cyclicPrefix", buffer(bufIdx +  length, 1):le_uint())
+	length = length + 1
+	return length
+end
+
+function rx_rfchain_cfg_tlv(subtree, buffer, bufIdx)
+	local length = 0
+	subtree:add("RFchainIdx", buffer(bufIdx +  length, 1):le_uint())
+	length = length + 1
+	subtree:add("RFchain_ctrl", buffer(bufIdx +  length, 1):le_uint())
+	length = length + 1
+	subtree:add("bandType", buffer(bufIdx +  length, 1):le_uint())
+	length = length + 1
+	subtree:add("bandnum", buffer(bufIdx +  length, 2):le_uint())
+	length = length + 2
+	subtree:add("carrierIdx", buffer(bufIdx +  length, 1):le_uint())
+	length = length + 1
+	subtree:add("bandwidth", buffer(bufIdx +  length, 1):le_uint())
+	length = length + 1
+	subtree:add("carrierFreq", buffer(bufIdx +  length, 4):le_uint())
+	length = length + 4
+	subtree:add("gain", buffer(bufIdx +  length, 2):le_int())
+	length = length + 2
+	subtree:add("subcarrierSpacing", buffer(bufIdx +  length, 1):le_uint())
+	length = length + 1
+	subtree:add("cyclicPrefix", buffer(bufIdx +  length, 1):le_uint())
+	length = length + 1
+	return length
+end
+
+function rf_config_req_tlv(payloadSubtree, buffer, i, bufIdx)
+	local subtree = payloadSubtree:add(nfapi_protocol, buffer(), "TLV ["..i.."]")
+
+	local length = 0
+	local tag = buffer(bufIdx +  length, 2):le_uint()
+	subtree:add("TAG: ", buffer(bufIdx + length, 2):le_uint())
+	length = length + 2
+	subtree:add("Length: ", buffer(bufIdx + length, 2):le_uint())
+	length = length + 2
+
+	if tag == 0x6100 then
+		local tx_rf_chain = subtree:add(nfapi_protocol, buffer(), "TX_RF_CHAIN_CFG_TLV")
+		length = length + tx_rfchain_cfg_tlv(tx_rf_chain, buffer, bufIdx + length)
+	elseif tag == 0x6003 then
+		local rx_rf_chain = subtree:add(nfapi_protocol, buffer(), "RX_RF_CHAIN_CFG_TLV")
+		length = length + rx_rfchain_cfg_tlv(tx_rf_chain, buffer, bufIdx + length)
+	elseif tag == 0x5555 then
+		subtree:add("dal_rf_cfg_tlv_value: ", buffer(bufIdx +  length, 4):le_uint())
+		length = length +  4
+	else
+		local len = buffer(bufIdx - length, 2):le_uint()
+		for j = 0, len - 1, 1 do
+			subtree:add("value["..j.."]: ", buffer(bufIdx +  length, 1):le_uint())
+			length = length + 1
+		end 
+	end
+	return length
+end
+
 function nfapi_protocol.dissector(buffer, pinfo, tree)
 	length = buffer:len()
 	if length == 0 then return end
@@ -723,6 +837,68 @@ function nfapi_protocol.dissector(buffer, pinfo, tree)
 		payloadSubtree:add(error_code, buffer(21, 1):le_uint())
 	elseif msgType_name == "EP5_MSG_TYPE_RESET_REQUEST" then
 	elseif msgType_name == "EP5_MSG_TYPE_RESET_INDICATION" then	
+	elseif msgType_name == "P19_NFAPI_RF_PARAM_REQUEST" then
+	elseif msgType_name == "P19_NFAPI_RF_PARAM_RESPONSE" then
+		payloadSubtree:add(error_code, buffer(16, 1):uint())
+		payloadSubtree:add(num_tlv, buffer(17, 1))
+		local num = buffer(17, 1):uint()
+		local bufIdx = 18
+		for i = 0, num - 1, 1 do
+			local length = rf_param_res_tlv(payloadSubtree, buffer, i, bufIdx)
+			bufIdx = bufIdx + length
+		end
+	elseif msgType_name == "P19_NFAPI_RF_CONFIG_REQUEST" then
+		payloadSubtree:add(num_tlv, buffer(16, 1))
+		local num = buffer(16, 1):uint()
+		local bufIdx = 17
+		for i = 0, num - 1, 1 do
+			local length = rf_config_req_tlv(payloadSubtree, buffer, i, bufIdx)
+			bufIdx = bufIdx + length
+		end	
+	elseif msgType_name == "P19_NFAPI_RF_CONFIG_RESPONSE" then
+		local bufIdx = 16
+		payloadSubtree:add(error_code, buffer(bufIdx, 1):le_uint())
+		bufIdx = bufIdx + 1
+		payloadSubtree:add("numOfInvalidOrUnsupportedTlvs: ", buffer(bufIdx, 1):le_uint())
+		local num1 = buffer(bufIdx, 1):le_uint()
+		bufIdx = bufIdx + 1
+		payloadSubtree:add("numOfInvalidTlvsThatCanOnlyBeConfiguredInIDLE: ", buffer(bufIdx, 1):le_uint())
+		local num2 = buffer(bufIdx, 1):le_uint()
+		bufIdx = bufIdx + 1
+		payloadSubtree:add("numOfInvalidTlvsThatCanOnlyBeConfiguredInRUNNING: ", buffer(bufIdx, 1):le_uint())
+		local num3 = buffer(bufIdx, 1):le_uint()
+		bufIdx = bufIdx + 1
+		payloadSubtree:add("numOfMissingTlvs: ", buffer(bufIdx, 1):le_uint())
+		local num4 = buffer(bufIdx, 1):le_uint()
+		bufIdx = bufIdx + 1
+
+		local tlv1 = payload:add(nfapi_protocol, buffer(), "list of numOfInvalidOrUnsupportedTlvs")
+		for i = 0, num1 - 1 do
+			tlv1:add("TLV["..i.."]: ", buffer(bufIdx, 2):le_uint())
+			bufIdx = bufIdx + 2
+		end
+		
+		local tlv2 = payload:add(nfapi_protocol, buffer(), "list of numOfInvalidTlvsThatCanOnlyBeConfiguredInIDLE")
+		for i = 0, num2 - 1 do
+			tlv2:add("TLV["..i.."]: ", buffer(bufIdx, 2):le_uint())
+			bufIdx = bufIdx + 2
+		end
+		
+		local tlv3 = payload:add(nfapi_protocol, buffer(), "list of numOfInvalidTlvsThatCanOnlyBeConfiguredInRUNNING")
+		for i = 0, num3 - 1 do
+			tlv3:add("TLV["..i.."]: ", buffer(bufIdx, 2):le_uint())
+			bufIdx = bufIdx + 2
+		end
+		
+		local tlv4 = payload:add(nfapi_protocol, buffer(), "list of numOfMissingTlvs")
+		for i = 0, num4 - 1 do
+			tlv4:add("TLV["..i.."]: ", buffer(bufIdx, 2):le_uint())
+			bufIdx = bufIdx + 2
+		end
+		
+	elseif msgType_name == "P19_NFAPI_RF_START_REQUEST" then
+	elseif msgType_name == "P19_NFAPI_RF_START_RESPONSE" then	
+		payloadSubtree:add(error_code, buffer(16, 1):uint())
 	end
 end
 
